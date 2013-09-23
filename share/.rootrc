@@ -1,0 +1,12 @@
+Unix.*.Root.DynamicPath:     .:$HOME/Avec
+Unix.*.Root.MacroPath:   .
+Unix.*.Root.UseTTFonts:     true
+
+Root.ShowPath:           false
+
+Rint.Logon:              rootlogon.C
+
+Rint.History:            ./.root_hist
+
+ACLiC.IncludePaths:     -I/$HOME/Avec -I./
+

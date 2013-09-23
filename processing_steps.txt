@@ -1,0 +1,246 @@
+Processing steps for LAS data
+
+
+#########################################################################################
+
+1. Get Signal Maxima
+
+1.1 Function
+get_max_signal(filename, output_filename, plot)
+
+1.2. Description 
+Finds the maximum strip signal for every module and every event.
+If plot is 'true' the control plots will be generated.
+
+1.3. Output
+All Avec objects below have as many entries as there are events in the Raw data Tree.
+
+LASGlobalData<Avec> max : Object with all maxima for all modules and all events
+Avec eventnumber : Vector with event numbers
+Avec unixTime : Vector with timestamps (resolution is 1 s)
+
+Avec signal_all : Sum of all maxima of all modules
+
+Avec signal_tec_r4_nooverlap : Sum of TEC Ring 4 modules, excluding overlapping beams (1, 4, 6)
+Avec signal_at_nooverlap : Sum of AT modules, excluding overlapping beams (1, 4, 6)
+
+Avec signal_tec_r6 : Sum of all TEC Ring 6 modules
+Avec signal_tec_r4 : Sum of all TEC Ring 4 modules
+
+Avec signal_tecplus : Sum of all TEC+ modules
+Avec signal_tecminus : Sum of all TEC- modules
+Avec signal_tec_disc1 : Sum of all TEC modules on disc 1 (+ and - side)
+Avec signal_at : Sum of all Alignment Tube modules
+
+Avec signal_tec_close : Sum of all TEC modules on discs 3, 4, 5, 6, 7, 8
+Avec signal_tec_far : Sum of all tEC modules on discs 1, 2, 9
+
+1.4. Control Plots
+void control_max_signal(const std::string& max_file, bool full_output)
+
+The flag 'full_output' should only be set to true for small files (<= 2000 events), or else it will become too slow and eventually crash.
+
+#########################################################################################
+
+2. Filter out noisy events
+
+2.1. Function
+
+Noise_Filter  (output_filename, signal_threshold, bad_ratio_cut);
+
+2.2 Description
+If the sum of all signals is smaller than signal_threshold, the event is considered noise. 
+Default value is signal_threshold = 6000.
+The number of noise events is compared to the number of good events, and if the ratio exceeds bad_ratio_cut, the run is considered 'not good'.
+Information on the threshold, cut, run quality and noisy/good ratio are stored in Avecs of size 1.
+
+2.3 Output
+Avec good_event    : 1 if event is considered good, 0 if it is considered noisy. One entry per event.
+Avec good_run      : Avec of size 1. The single entry is 1 for runs that are considered good, and 0 otherwise.
+Avec signal_thresh : Avec of size 1, containing the value of signal_threshold
+Avec bad_ratio_cut : Avec of size 1, containing the value of bad_ratio_cut
+Avec bad_ratio     : Avec of size 1, containing the ratio between noise and good events
+
+2.4. Control Plots
+None so far
+
+#########################################################################################
+
+3. Determine Blocks of LAS events
+
+3.1. Function
+
+Block_Slicer_new  (output_filename, plot, factor, min_block_size);
+
+3.2 Description
+The function evaluates the event numbers and groups events with small event number difference to blocks.
+The parameter factor specifies how much larger the event number difference is between blocks compared to events within one block.
+Groups of events which are smaller than min_block_size are not assigned to any block.
+Default values are factor = 20 and min_block_size = 1000
+If plot is true, the control plots are generated.
+
+3.3 Output
+
+Avec event_diff : Difference between two consecutive event numbers. First entry is 0, one entry per event.
+Avec event_block : Block Nr. that was assigned to the event, -1 if not assigned, one entry per event.
+Avec threshold : Avec with only one value, which is the threshold used to detect block boundaries in event_diff
+Avec block_nr : Block Nrs. that were created, one entry per block, numbering starts at 0 (rather superfluous vector...)
+Avec block_timestamp : Timestamp of last event in block, one entry per block
+Avec block_size : Size of the blocks, one entry per block
+Avec block_firstlumi : First lumiblock in the block, one entry per block (NB: 'lumiblock' does not mean the same as 'block')
+Avec block_lastlumi : Last lumiblock in the block, one entry per block (NB: 'lumiblock' does not mean the same as 'block')
+
+3.4. Control Plots
+void control_blocks(const std::string& output_filename, bool save_plots);
+
+If the flag 'save_plots' is true, the canvas will be written to the results file.
+
+#########################################################################################
+
+4. Label the event intensities
+
+4.1. Function
+
+Event_Labels  (output_filename);
+
+4.2 Description
+This function attempts to assign labels to every event according to the pattern of signals that were found.
+First the Alignment Tube events are distinguished from TEC internal events by comparing the sum of signals for AT modules and TEC modules.
+For TEC, only Ring 4 modules are used and overlapping beams are ignored.
+For TEC AT modules, the overlapping beams are also ignored.
+Then the distinction of the 5 intensity levels is performed.
+
+4.3 Output
+Avec AT_event : 1 for AT events, 0 otherwise
+Avec TEC_event : 1 for TEC internal events, 0 otherwise
+Avec dist_at : estimator used for separating intensities in AT events
+Avec cuts_at : cuts used for separating the groups in dist_at
+Avec dist_tec : estimator used for separating intensities in TEC events
+Avec cuts_tec : cuts used for separating the groups in dist_tec
+Avec label_step : intensity step label ranging from 1 - 10. If not assigned the value is 0.
+Avec step_xx : xx is an intensity ranging from 1 to 10, entries are 1 if event belongs to this intensity step. 
+
+4.4. Control Plots
+void control_intensities(const std::string& result_filename)
+
+#########################################################################################
+
+5. Check if the block size and the intensity label sequence are as expected
+
+5.1. Function
+
+Block_Label_Check(output_filename, expected_block_size)
+
+5.2 Description
+If the size of a block is not equal expected_block_size, the block is marked as 'not good'.
+Then the intensity labels of the block are checked, to see if they match the expected pattern (consecutive sequences of 1-10).
+If a mismatch is found, the block is marked as 'not good'.
+If the run contains no good blocks, it will be marked as 'not good'.
+This flag is combined with the one from Noise_Filter (step 2.).
+
+5.3 Output
+Avec good_run   : Avec of size 1. The single entry is 1 for runs that are considered good, and 0 otherwise.
+Avec good_block : Avec with as many entries as there are blocks. 1 for good blocks, 0 otherwise.
+
+5.4 Control Plots
+None so far
+
+#########################################################################################
+
+6. Create a step mask
+
+6.1. Function
+
+replace_step_mask("step_mask_1.txt", output_filename);
+
+6.2 Description
+The step mask contains one integer value per module, which specifies which intensity setting should be chosen for a particular module.
+if the value is 0, the module is to be skipped.
+In principle more than one setting could be chosen for certain modules, but this is not foreseen yet.
+
+6.3 Output
+LASGlobalData<int> step_mask : contains a value from 0 - 10 representing the intensity step that is good for this module (0 if none is good)
+
+6.4. Control Plots
+void control_step_mask(const std::string& filename)
+
+
+#########################################################################################
+
+7. Compute Laser profiles
+
+7.1. Function
+
+Signal_Integration(filename, output_filename);
+
+7.2 Description
+This function integrates the events for every module using the step mask for deciding which event is used for which module.
+The integration is performed per block and also for all good events in the data file.
+Within a block, the positions are also computed for every single event and the average and rms of theses positions is stored.
+For the block integration, position and rms calculation, the signal outside the expected strip range is computed for every single module in every single event.
+If it exceeds a given cut, the entry is rejected for the calculations.
+
+
+7.3 Output
+
+LASGlobalData<Avec> profiles : Laser profiles for each module, averaged over all events
+LASGlobalData<Avec> profiles_xx : Averaged Laser profiles for each module. One object per block (xx is the block number).
+LASGlobalData<int> norm_xx : Number of events that were integrated for each profile. One object per block (xx is the block number).
+LASGlobalData<double> pos_av_xx: Average position within one block for each module. One object per block (xx is the block number)
+LASGlobalData<double> rms_av_xx: RMS of average position within one block for each module. One object per block (xx is the block number)
+Avec comp_sig_acc_tec: Signal outside expected range in profiles that were accepted for TEC modules
+Avec comp_sig_rej_tec: Signal outside expected range in profiles that were rejected for TEC modules
+Avec comp_sig_acc_tob: Signal outside expected range in profiles that were accepted for TOB modules
+Avec comp_sig_rej_tob: Signal outside expected range in profiles that were rejected for TOB modules
+Avec comp_sig_acc_tib: Signal outside expected range in profiles that were accepted for TIB modules
+Avec comp_sig_rej_tib: Signal outside expected range in profiles that were rejected for TIB modules
+
+
+7.4. Control Plots
+void control_profiles(const std::string& filename)
+
+
+#########################################################################################
+
+8. Calculate Laser spot positions
+
+8.1. Function
+
+Position_Calculation(output_filename);
+
+8.2 Description
+Calculate the laser spot position for each module from the laser integrated profiles.
+This is done for the overall integrated profiles.
+
+8.3 Output
+LASGlobalData<double> positions_strips : Positions obtained from integrated profiles of the entire run
+LASGlobalData<int> results_mask : the mask is zero for modules where no position was obtained and one otherwise
+
+8.4. Control Plots
+void control_positions(const std::string& filename)
+
+#########################################################################################
+
+9. Calculate changes within one run
+
+9.1. Function
+
+Run_History(output_filename);
+
+9.2 Description
+Calculate laser spot positions per block
+Calculate the changes of the laser spot positions per block.
+Use as reference the positions obtained from the overall integrated profiles.
+Then calculate TEC Alignment parameters for each block. Ring 4 and 6 are treated separately for the time being.
+
+9.3 Output
+
+LASGlobalData<double> positions_xx : xx is the block Number
+LASGlobalData<int> positions_mask_xx : xx is the block Number
+LasAlPar alpar_xx : xx is the block Number
+LASGlobalData<Avec> pos_history : 
+LASGlobalData<Avec> diff_history : 
+
+9.4. Control Plots
+void control_history(const std::string& results_file)
+

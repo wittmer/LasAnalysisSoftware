@@ -1,0 +1,12 @@
+Unix.*.Root.DynamicPath:     .:$HOME/Avec:./share
+Unix.*.Root.MacroPath:   .:./share
+Unix.*.Root.UseTTFonts:     true
+
+Root.ShowPath:           false
+
+Rint.Logon:              rootlogon.C
+
+Rint.History:            ./.root_hist
+
+ACLiC.IncludePaths:     -I/$HOME/Avec -I./ -I./share
+
