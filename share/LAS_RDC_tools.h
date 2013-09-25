@@ -31,8 +31,9 @@ double calc_chi2(const LASGlobalData<double>& dif,const LASGlobalData<double>& e
 void check_run(const std::string& result_file, const std::string& pos_prefix = "positions_");
 void check_run_list(const std::string& run_list_name, const std::string& pos_prefix = "positions_");
 void check_run_list(const std::string& ref_filename, const std::vector<std::string>& file_list, const std::string& pos_prefix = "positions_");
-void get_file_list(const std::string& filename, std::vector<std::string>& file_list);
-void get_file_list(const std::string& filename, std::string& ref_file, std::vector<std::string>& file_list);
+
+void get_file_list(const std::string& filename, std::vector<std::string>& file_list, const std::string& path_prefix = "");
+void get_file_list(const std::string& filename, std::string& ref_file, std::vector<std::string>& file_list, const std::string& path_prefix = "");
 
 
 void check_ref_pos(const std::string& ref_file, int block_nr= -1, double rms_cut = 0.5, const std::string& pos_prefix = "positions_");
@@ -40,6 +41,7 @@ bool get_ref_pos(const std::string& ref_file, LASGlobalData<double>& ref_pos, LA
 void fill_global_tec_data(const LASGlobalData<double>& theData, const LASGlobalData<int>& mask, Avec& tecp_r4, Avec& tecp_r6, Avec& tecm_r4, Avec& tecm_r6);
 
 void Calculate_Difference(const std::string& filename, LASGlobalData<double>& ref_pos, LASGlobalData<int>& ref_mask);
+float calc_pos(const std::vector<float>& buffer, std::vector<float>::size_type max_idx, float ratio = 0.5);
 void calc_pos(LASGlobalData<Avec>& profiles, LASGlobalData<double>& positions, LASGlobalData<int>& results_mask,   double ratio = 0.5);
 
 

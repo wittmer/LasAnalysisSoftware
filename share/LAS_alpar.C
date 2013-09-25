@@ -2,7 +2,12 @@
 #include "LAS_basic_tools.h"
 
 #include "TFile.h"
+#include "TCanvas.h"
+#include "TAxis.h"
+#include "TROOT.h"
 
+#define __AVECROOT__
+#include "Avec2D.h"
 
 LasAlPar& alpar_get(const std::string& name, TFile& file)
 {
@@ -99,28 +104,168 @@ void alpar_rand_gauss(LasAlPar& alpar, double sigma_dphik, double sigma_dxk, dou
 
 
 ///////////////////////////////////////////////////////////////////////////////////
+// AtChi implementation
+
+ClassImp(AtChi)
+
+AtChi::AtChi():
+  AT(0),
+  beam(Avec(8)),
+  tob(0),
+  tib(0),
+  tecp(0),
+  tecm(0)
+{;}
+
+
+///////////////////////////////////////////////////////////////////////////////////
 // AtPar implementation
 
 ClassImp(AtPar)
-
-  Avec beam_a; //beam slopes
-  Avec beam_b; //beam offsets
-  Avec er_beam_a; //errors of beam slopes 
-  Avec er_beam_b; //errors of beam offsets
-  Avec b_chi; // chi2/ndf of beams
-  Avec b_chi0; // chi2/ndf of beams before fit
-
 
 AtPar::AtPar():
   beam_a(Avec(8)),
   beam_b(Avec(8)),
   er_beam_a(Avec(8)),
   er_beam_b(Avec(8)),
-  b_chi(Avec(8)),
-  b_chi0(Avec(8))
+  tob_dx(0),  
+  tob_dy(0),  
+  tob_rx(0),  
+  tob_ry(0),  
+  tob_rz(0),  
+  tob_tz(0),  
+  er_tob_dx(0),  
+  er_tob_dy(0),  
+  er_tob_rx(0),  
+  er_tob_ry(0),  
+  er_tob_rz(0),  
+  er_tob_tz(0),  
+  tob_dxdy(0),  
+  tob_dxrx(0),  
+  tob_dxry(0),  
+  tob_dxrz(0),  
+  tob_dxtz(0),  
+  tob_dyrx(0),  
+  tob_dyry(0),  
+  tob_dyrz(0),  
+  tob_dytz(0),  
+  tob_rxry(0),  
+  tob_rxrz(0),  
+  tob_rxtz(0),  
+  tob_ryrz(0),  
+  tob_rytz(0),  
+  tob_rztz(0),  
+  tib_dx(0),  
+  tib_dy(0),  
+  tib_rx(0),  
+  tib_ry(0),  
+  tib_rz(0),  
+  tib_tz(0),  
+  er_tib_dx(0),  
+  er_tib_dy(0),  
+  er_tib_rx(0),  
+  er_tib_ry(0),  
+  er_tib_rz(0),  
+  er_tib_tz(0),  
+  tib_dxdy(0),  
+  tib_dxrx(0),  
+  tib_dxry(0),  
+  tib_dxrz(0),  
+  tib_dxtz(0),  
+  tib_dyrx(0),  
+  tib_dyry(0),  
+  tib_dyrz(0),  
+  tib_dytz(0),  
+  tib_rxry(0),  
+  tib_rxrz(0),  
+  tib_rxtz(0),  
+  tib_ryrz(0),  
+  tib_rytz(0),  
+  tib_rztz(0),  
+  tecp_dx(0),  
+  tecp_dy(0),  
+  tecp_rx(0),  
+  tecp_ry(0),  
+  tecp_rz(0),  
+  tecp_tz(0),  
+  er_tecp_dx(0),  
+  er_tecp_dy(0),  
+  er_tecp_rx(0),  
+  er_tecp_ry(0),  
+  er_tecp_rz(0),  
+  er_tecp_tz(0),  
+  tecp_dxdy(0),  
+  tecp_dxrx(0),  
+  tecp_dxry(0),  
+  tecp_dxrz(0),  
+  tecp_dxtz(0),  
+  tecp_dyrx(0),  
+  tecp_dyry(0),  
+  tecp_dyrz(0),  
+  tecp_dytz(0),  
+  tecp_rxry(0),  
+  tecp_rxrz(0),  
+  tecp_rxtz(0),  
+  tecp_ryrz(0),  
+  tecp_rytz(0),  
+  tecp_rztz(0),  
+  tecm_dx(0),  
+  tecm_dy(0),  
+  tecm_rx(0),  
+  tecm_ry(0),  
+  tecm_rz(0),  
+  tecm_tz(0),  
+  er_tecm_dx(0),  
+  er_tecm_dy(0),  
+  er_tecm_rx(0),  
+  er_tecm_ry(0),  
+  er_tecm_rz(0),  
+  er_tecm_tz(0),  
+  tecm_dxdy(0),  
+  tecm_dxrx(0),  
+  tecm_dxry(0),  
+  tecm_dxrz(0),  
+  tecm_dxtz(0),  
+  tecm_dyrx(0),  
+  tecm_dyry(0),  
+  tecm_dyrz(0),  
+  tecm_dytz(0),  
+  tecm_rxry(0),  
+  tecm_rxrz(0),  
+  tecm_rxtz(0),  
+  tecm_ryrz(0),  
+  tecm_rytz(0),  
+  tecm_rztz(0)
 {
+  ;
+}
+
+void AtPar::print(LAS::beam_group beam_group, int detail_flag)
+{
+  std::cout << "AT Patrameters:" << std::endl;
+  std::cout << "Beam Slopes[murad/m]:\n " << beam_a*1e9 << std::endl; //beam slopes
+  std::cout << "Beam offsets[murad]:\n" << beam_b*1e6 << std::endl; //beam offsets
+
+  std::cout << "tib_dx[mum]:     " << tib_dx*1e3 << std::endl; //TIB x-displacement
+  std::cout << "tib_dy[mum]:     " << tib_dy*1e3 << std::endl; //TIB y-displacement
+  std::cout << "tib_rx[murad]:   " << tib_rx*1e6 << std::endl; //TIB x-rotation
+  std::cout << "tib_ry[murad]:   " << tib_ry*1e6 << std::endl; //TIB y-rotation
+  std::cout << "tib_rz[murad]:   " << tib_rz*1e6 << std::endl; //TIB z-rotation
+  std::cout << "tib_tz[murad/m]: " << tib_tz*1e9 << std::endl; //TIB z-torsion
+
+  std::cout << "chi0.tib: " << chi0.tib << std::endl; //chi^{2}/ndf for TIB before fit
+  std::cout << "chi.tib : " << chi.tib  << std::endl; //chi^{2}/ndf for TIB
+
+  std::cout << std::endl;
+  std::cout << "tecm_dx: " << tecm_dx << std::endl; //TEC- x-displacement
+  std::cout << "tecm_dy: " << tecm_dy << std::endl; //TEC- y-displacement
+  std::cout << "tecm_rx: " << tecm_rx << std::endl; //TEC- x-rotation
+  std::cout << "tecm_ry: " << tecm_ry << std::endl; //TEC- y-rotation
+  std::cout << "tecm_rz: " << tecm_rz << std::endl; //TEC- z-rotation
+  std::cout << "tecm_tz: " << tecm_tz << std::endl; //TEC- z-torsion
 
 }
+
 
 std::ostream& operator<<(std::ostream& out, const AtPar& ap)
 {
@@ -130,7 +275,7 @@ std::ostream& operator<<(std::ostream& out, const AtPar& ap)
   out << "TIB y-rotation: " << ap.tib_ry*1e6 << " +- " << ap.er_tib_ry << " microrad" << std::endl; //
   out << "TIB z-rotation: " << ap.tib_rz*1e6 << " +- " << ap.er_tib_rz << " microrad" << std::endl; //
   out << "TIB z-torsion: " << ap.tib_tz*1e9 << " +- " << ap.er_tib_tz << " microrad / m" << std::endl; //
-  out << "TIB chi2: " << ap.tib_chi << " was " << ap.tib_chi0 << " before the fit" << std::endl;
+  out << "TIB chi2: " << ap.chi.tib << " was " << ap.chi0.tib << " before the fit" << std::endl;
   return out;
 }
 
@@ -152,7 +297,20 @@ TecPar::TecPar() :
   DthetaA_r4(Avec(8,0.0)),
   DthetaB_r4(Avec(8,0.0)),
   DthetaA_r6(Avec(8,0.0)),
-  DthetaB_r6(Avec(8,0.0))
+  DthetaB_r6(Avec(8,0.0)),
+  Dphi0_er(0), 
+  Dx0_er(0), 
+  Dy0_er(0), 
+  Dphit_er(0), 
+  Dxt_er(0), 
+  Dyt_er(0),
+  Dphik_er(Avec(9,0.0)),
+  Dxk_er(Avec(9,0.0)),
+  Dyk_er(Avec(9,0.0)),
+  DthetaA_r4_er(Avec(8,0.0)),
+  DthetaB_r4_er(Avec(8,0.0)),
+  DthetaA_r6_er(Avec(8,0.0)),
+  DthetaB_r6_er(Avec(8,0.0))
 {;}
 
 void TecPar::print()
@@ -765,6 +923,7 @@ void LasAlPar::RescaleRot(double factor)
   tecp_r6.Dphi0 *= factor;
   tecp_r6.Dphit *= factor;
   tecp_r6.Dphik *= factor;
+
   tecm_r4.Dphi0 *= factor;
   tecm_r4.Dphit *= factor;
   tecm_r4.Dphik *= factor;
@@ -775,6 +934,7 @@ void LasAlPar::RescaleRot(double factor)
   tecp.Dphi0 *= factor;
   tecp.Dphit *= factor;
   tecp.Dphik *= factor;
+
   tecm.Dphi0 *= factor;
   tecm.Dphit *= factor;
   tecm.Dphik *= factor;
@@ -783,6 +943,7 @@ void LasAlPar::RescaleRot(double factor)
   tecp_r4.DthetaB *= factor;
   tecp_r6.DthetaA *= factor;
   tecp_r6.DthetaB *= factor;
+
   tecm_r4.DthetaA *= factor;
   tecm_r4.DthetaB *= factor;
   tecm_r6.DthetaA *= factor;
@@ -792,6 +953,7 @@ void LasAlPar::RescaleRot(double factor)
   tecp.DthetaB_r4 *= factor;
   tecp.DthetaA_r6 *= factor;
   tecp.DthetaB_r6 *= factor;
+
   tecm.DthetaA_r4 *= factor;
   tecm.DthetaB_r4 *= factor;
   tecm.DthetaA_r6 *= factor;
@@ -844,4 +1006,5 @@ void LasAlPar::RescaleTrans(double factor)
   tecm.Dyk *= factor;
 
 }
+
 

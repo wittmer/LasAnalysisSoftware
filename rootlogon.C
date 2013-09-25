@@ -17,10 +17,6 @@
   gSystem -> Load ( "LAS_analysis.so" );
   std::cout << " done" << endl;
 
-  std::cout << "Loading LAS_data_processing.C ...";
-  gROOT->ProcessLine(".L LAS_data_processing.C+");
-  std::cout << " done" << endl;
-
   gStyle -> SetCanvasBorderMode ( 0 );
   gStyle -> SetPadBorderMode ( 0 );
   gStyle -> SetCanvasColor ( 0 );

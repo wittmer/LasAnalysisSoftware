@@ -54,6 +54,7 @@ void check_ref_pos(const std::string& ref_file, int block_nr, double rms_cut, co
 
   get_ref_pos(ref_file, ref_pos, ref_err, ref_mask, block_nr, rms_cut, pos_prefix);
 
+  //print_global_data(ref_pos);
   draw_global_data(ref_pos, ref_err, ref_mask);
 
 }
@@ -152,64 +153,76 @@ void check_run_list(const std::string& ref_filename, const std::vector<std::stri
 }
 
 
-void get_file_list(const std::string& filename, std::vector<std::string>& file_list)
+void get_file_list(const std::string& filename, std::vector<std::string>& file_list, const std::string& path_prefix )
 {
   std::ifstream f(filename.c_str());
   
   while(f){
     std::string buffer = get_next_line(f);
     if(buffer != ""){
-      file_list.push_back(buffer);
+      file_list.push_back( (path_prefix != "" ? path_prefix + "/" : "" ) + buffer );
     }
   }
 }
 
-void get_file_list(const std::string& filename, std::string& ref_file, std::vector<std::string>& file_list)
+void get_file_list(const std::string& filename, std::string& ref_file, std::vector<std::string>& file_list, const std::string& path_prefix )
 {
   std::ifstream f(filename.c_str());
   
-  ref_file = get_next_line(f);
+  ref_file = (path_prefix != "" ? path_prefix + "/" : "" ) + get_next_line(f);
   std::cout << "Reference file: " << ref_file << std::endl;
 
   while(f){
     std::string buffer = get_next_line(f);
     if(buffer != ""){
-      file_list.push_back(buffer);
+      file_list.push_back( (path_prefix != "" ? path_prefix + "/" : "" ) + buffer );
     }
   }
 }
 
 bool get_ref_pos_average(const std::string& ref_file, LASGlobalData<double>& ref_pos, LASGlobalData<double>& ref_err, LASGlobalData<int>& ref_mask, double rms_cut, const std::string& pos_prefix)
 {
-
-  Avec good_block = avec_get("good_block", ref_file);
+  TFile f(ref_file.c_str(), "READ");
+  Avec good_block = avec_get("good_block", f);
   if(vsum(good_block) == 0){
     std::cerr << "No good block in reference file " << ref_file << std::endl;
     return false;
   }
 
-  ref_mask = LASGlobalData<int>(1);
-  ref_err = LASGlobalData<int>(0);
+  std::cout << vsum(good_block) << " good blocks out of " << good_block.size() << std::endl;
 
-  Avec::size_type ref_size = good_block.size();
-  for(Avec::size_type idx = 0; idx < ref_size; idx++){
+  ref_err = LASGlobalData<double>(0.);
+
+  LASGlobalData<int> norm(0);
+
+  for(Avec::size_type idx = 0; idx < good_block.size(); idx++){
     if(good_block[idx] != 1) continue;
 
     std::ostringstream block_nr_stream;
     block_nr_stream << idx;
     std::string block_nr = block_nr_stream.str();
 
-    LASGlobalData<double> rms = global_data_get<double>("pos_error_" + block_nr, ref_file);
-    LASGlobalData<double> rms_mask = rms < rms_cut || rms != rms;
+    //LASGlobalData<int> norm;
+    LASGlobalData<int> block_norm = global_data_get<int>("norm_" + block_nr, f);
+    LASGlobalData<double> pos = global_data_get<double>(pos_prefix + block_nr, f);
+    LASGlobalData<double> rms = global_data_get<double>("pos_error_" + block_nr, f) / sqrt(block_norm);
+    LASGlobalData<int> block_mask = global_data_get<int>("positions_mask_" + block_nr, f) && (rms < rms_cut) && !(rms != rms);
 
     remove_nan(rms);
+    pos *= block_mask;
+    rms *= block_mask;
+    norm += block_mask;
 
-    ref_pos +=  global_data_get<double>(pos_prefix + block_nr, ref_file);
+    //ref_pos +=  global_data_get<double>(pos_prefix + block_nr, f) * block_mask;
+    ref_pos +=  pos * block_mask;
     ref_err +=  rms * rms;
-    ref_mask = ref_mask && global_data_get<int>("positions_mask_" + block_nr, ref_file) && rms_mask;
   }
-  ref_pos /= vsum(good_block);
-  ref_err = sqrt(ref_err / vsum(good_block));
+  f.Close();
+  ref_pos = ref_pos / norm;
+  ref_err = sqrt(ref_err / norm);
+  remove_nan(ref_pos);
+  remove_nan(ref_err);
+  ref_mask = norm > 0;
   return true;
 }
 
@@ -489,6 +502,23 @@ void at_beam_draw(const std::string& data_file, int block_nr, const std::string&
 
 
 // Helping functions
+
+//! Calculate the positions given the profiles
+float calc_pos(const std::vector<float>& buffer, std::vector<float>::size_type max_idx, float ratio)
+{
+  float threshold = buffer[max_idx] * ratio;
+
+  std::vector<float>::size_type left_idx = max_idx;
+  std::vector<float>::size_type right_idx = max_idx;
+
+  do{left_idx--;}while(buffer[left_idx] > threshold && left_idx > 0);
+  do{right_idx++;}while(buffer[right_idx] > threshold && right_idx < buffer.size());
+
+  float left_xt = (threshold - buffer[left_idx])/(buffer[left_idx+1] - buffer[left_idx]) + left_idx;
+  float right_xt = (threshold - buffer[right_idx-1])/(buffer[right_idx] - buffer[right_idx-1]) + right_idx -1;
+
+  return (left_xt + right_xt)/2;
+}
 
 //! Calculate the positions given the profiles
 void calc_pos(LASGlobalData<Avec>& profiles, LASGlobalData<double>& positions, LASGlobalData<int>& results_mask,   double ratio)
@@ -2080,6 +2110,10 @@ void Noise_Filter(const std::string& filename, const LAS::AnalysisParameters& pa
   case 2:
     good_event = fabs(signal_tec_r4_nooverlap - signal_at_nooverlap/3*2) > par.noise_signal_thresh;
     break;
+  case 3:
+    {Avec preselect =  signal_all > par.noise_signal_thresh * 10.0;
+    good_event = fabs(signal_tec_r4_nooverlap - signal_at_nooverlap/3*2) * preselect > par.noise_signal_thresh;
+    break;}
   default:
     good_event = signal_all > par.noise_signal_thresh;
   }

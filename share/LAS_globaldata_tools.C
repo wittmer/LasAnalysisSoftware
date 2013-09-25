@@ -18,6 +18,46 @@
 #include "TLegend.h"
 #include "TAxis.h"
 
+// Specializtion for drawing Avecs
+template <>
+void global_data_draw<Avec>(const LASGlobalData<Avec>& data)
+{
+  std::cout << "global_data_draw<Avec>" << std::endl;
+  draw_global_data(data);
+}
+
+template void global_data_draw<Avec>(const LASGlobalData<Avec>&);
+
+// Specializtion for drawing doubles
+template <>
+void global_data_draw<double>(const LASGlobalData<double>& data)
+{
+  std::cout << "global_data_draw<double>" << std::endl;
+  draw_global_data(data);
+}
+
+template void global_data_draw<double>(const LASGlobalData<double>&);
+
+// Specializtion for drawing floats
+template <>
+void global_data_draw<float>(const LASGlobalData<float>& data)
+{
+  std::cout << "global_data_draw<float>" << std::endl;
+  draw_global_data(data, "");
+}
+
+template void global_data_draw<float>(const LASGlobalData<float>&);
+
+// Specializtion for drawing ints
+template <>
+void global_data_draw<int>(const LASGlobalData<int>& data)
+{
+  std::cout << "global_data_draw<int>" << std::endl;
+  draw_global_data<int>(data);
+}
+
+template void global_data_draw<int>(const LASGlobalData<int>&);
+
 //! Generate random values following a gaussian distribution with mean = 0 and sigma = 1
 LASGlobalData<double> global_data_random_gauss()
 {
@@ -48,8 +88,10 @@ void global_data_stat(const LASGlobalData<Avec>& data, LASGlobalData<double>& me
 }
 
 //! Draw global data values against z-positions
-void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<double>& error, const LASGlobalData<int>& mask, LAS::beam_group group, const std::string& canvas_name)
+TMultiGraph* draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<double>& error, const LASGlobalData<int>& mask, LAS::beam_group group, const std::string& canvas_name)
 {
+  TMultiGraph* retval = 0;
+
   std::vector<std::string> legend;
   legend.push_back("beam 0");
   legend.push_back("beam 1");
@@ -66,8 +108,8 @@ void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<d
     std::vector<Avec> yvals(8);
     std::vector<Avec> err(8);
     
-    //LASGlobalDataLoop loop(LASGlobalDataLoop::AT);
-    LASGlobalDataLoop loop(convert_to_loop_type(group));
+    LASGlobalDataLoop loop(LASGlobalDataLoop::AT);
+    //LASGlobalDataLoop loop(convert_to_loop_type(group));
     do{
       if(loop.GetEntry(mask) != 1) continue;
       xvals[loop.get_beam()].push_back( loop.GetEntry(zpos()) );
@@ -75,14 +117,16 @@ void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<d
       err[loop.get_beam()].push_back( loop.GetEntry(error) );
       
     }while (loop.next());
-    
-    new TCanvas(canvas_name.c_str(), canvas_name.c_str());
+
+    std::string canvas_name_at = canvas_name + "_AT";
+    new TCanvas(canvas_name_at.c_str(), canvas_name_at.c_str());
     
     TMultiGraph* mgr = avec_draw(xvals, yvals, err, "Alignment Tubes","zpos [mm]","","AP");
-    AddLegend(mgr, legend, 2);
+    AddLegend(mgr, legend, 2, 0.6, 0.8, 1, 1);
+    retval = mgr;
   }
 
-  if(group == LAS::TEC){
+  if(group == LAS::TEC || group == LAS::ALL){
     std::vector<Avec> xvals_tecp_r4(8);
     std::vector<Avec> yvals_tecp_r4(8);
     std::vector<Avec> xvals_tecp_r6(8);
@@ -124,26 +168,30 @@ void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<d
       
     }while (loop.next());
 
-    TCanvas* cv_tec = new TCanvas("TEC", "TEC Internal");
+    TCanvas* cv_tec = new TCanvas(canvas_name.c_str(), canvas_name.c_str());
     cv_tec->Divide(2,2);
     TMultiGraph* mgr; 
     cv_tec->cd(1);
     mgr = avec_draw(xvals_tecp_r4, yvals_tecp_r4, "TEC+ Ring 4","zpos [mm]","","AP");
     cv_tec->cd(2);
     mgr = avec_draw(xvals_tecp_r6, yvals_tecp_r6, "TEC+ Ring 6","zpos [mm]","","AP");
+    AddLegend(mgr, legend, 2, 0.6, 0.8, 1, 1);
     cv_tec->cd(3);
     mgr = avec_draw(xvals_tecm_r4, yvals_tecm_r4, "TEC- Ring 4","zpos [mm]","","AP");
     cv_tec->cd(4);
     mgr = avec_draw(xvals_tecm_r6, yvals_tecm_r6, "TEC- Ring 6","zpos [mm]","","AP");
-    AddLegend(mgr, legend, 2);
+    retval = mgr;
   }
 
+  return retval;
 }
 
 
 //! Draw global data values against z-positions
-void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<int>& mask, LAS::beam_group group, const std::string& canvas_name)
+TMultiGraph* draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<int>& mask, LAS::beam_group group, const std::string& canvas_name)
 {
+  TMultiGraph* retval = 0;
+
   std::vector<std::string> legend;
   legend.push_back("beam 0");
   legend.push_back("beam 1");
@@ -172,6 +220,7 @@ void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<i
     
     TMultiGraph* mgr = avec_draw(xvals, yvals, "Alignment Tubes","zpos [mm]","","AP");
     AddLegend(mgr, legend, 2);
+    retval = mgr;
   }
 
   if(group == LAS::TEC){
@@ -228,8 +277,10 @@ void draw_global_data_z(const LASGlobalData<double>& data, const LASGlobalData<i
     cv_tec->cd(4);
     mgr = avec_draw(xvals_tecm_r6, yvals_tecm_r6, "TEC- Ring 6","zpos [mm]","","AP");
     AddLegend(mgr, legend, 2);
+    retval = mgr;
   }
 
+  return retval;
 }
 
 
@@ -841,58 +892,75 @@ void draw_global_data(const LASGlobalData<Avec>& theData, const std::string& opt
 
 
   if(group == LAS::ALL || group == LAS::AT || group == LAS::TIB || group == LAS::TOB){
-  TCanvas* cv_tib = new TCanvas("TIB", "TIB");
-  cv_tib->Divide(3,3);
-  TCanvas* cv_tob = new TCanvas("TOB", "TOB");
-  cv_tob->Divide(3,3);
-  TMultiGraph* mgr = 0;
 
-  for(int beam = 0; beam < 8; beam++){
-
-    std::vector<Avec> data_tib;
-    std::vector<Avec> data_tob;
-
-    std::vector<Avec> xval_tib;
-    std::vector<Avec> xval_tob;
-
-    for(int zpos = 0; zpos < 6; zpos++){
-
-      Avec data;
-
-      data = theData.GetEntry(2, -1, beam, zpos);
-      data_tib.push_back(data);
-      xval_tib.push_back(Avec(data.size(), 0, data.size() -1));
-
-      data = theData.GetEntry(3, -1, beam, zpos);
-      data_tob.push_back(data);
-      xval_tob.push_back(Avec(data.size(), 0, data.size() -1));
+    TCanvas* cv_tib = 0;
+    if(group != LAS::TOB){
+      cv_tib = new TCanvas("TIB", "TIB");
+      cv_tib->Divide(3,3);
     }
+    TCanvas* cv_tob = 0;
+    if(group != LAS::TIB){
+      cv_tob = new TCanvas("TOB", "TOB");
+      cv_tob->Divide(3,3);
+    }
+    TMultiGraph* mgr = 0;
 
+    for(int beam = 0; beam < 8; beam++){
 
-    std::ostringstream title;
-    title << "Beam " << beam;
+      std::vector<Avec> data_tib;
+      std::vector<Avec> data_tob;
 
-    cv_tib->cd(beam + 1);
-    avec_draw(xval_tib, data_tib, title.str(), "", "", options);
+      std::vector<Avec> xval_tib;
+      std::vector<Avec> xval_tob;
 
-    cv_tob->cd(beam + 1);
-    mgr = avec_draw(xval_tob, data_tob, title.str(), "", "", options);
+      for(int zpos = 0; zpos < 6; zpos++){
+
+	Avec data;
+
+	if(group != LAS::TOB){
+	  data = theData.GetEntry(2, -1, beam, zpos);
+	  data_tib.push_back(data);
+	  xval_tib.push_back(Avec(data.size(), 0, data.size() -1));
+	}
+
+	if(group != LAS::TIB){
+	  data = theData.GetEntry(3, -1, beam, zpos);
+	  data_tob.push_back(data);
+	  xval_tob.push_back(Avec(data.size(), 0, data.size() -1));
+	}
+      }
+
+      std::ostringstream title;
+      title << "Beam " << beam;
+      
+      if(group != LAS::TOB){
+	cv_tib->cd(beam + 1);
+	avec_draw(xval_tib, data_tib, title.str(), "", "", options);
+      }
+      if(group != LAS::TIB){
+	cv_tob->cd(beam + 1);
+	mgr = avec_draw(xval_tob, data_tob, title.str(), "", "", options);
+      }
+    }
+    std::vector<std::string> leg_tit;
+    leg_tit.push_back("Pos 1");
+    leg_tit.push_back("Pos 2");
+    leg_tit.push_back("Pos 3");
+    leg_tit.push_back("Pos 4");
+    leg_tit.push_back("Pos 5");
+    leg_tit.push_back("Pos 6");
+    
+    if(group != LAS::TOB){
+      cv_tib->cd(9);
+      AddLegend(mgr, leg_tit);
+    }
+    if(group != LAS::TIB){
+      cv_tob->cd(9);
+      AddLegend(mgr, leg_tit);
+    }
   }
-  std::vector<std::string> leg_tit;
-  leg_tit.push_back("Pos 1");
-  leg_tit.push_back("Pos 2");
-  leg_tit.push_back("Pos 3");
-  leg_tit.push_back("Pos 4");
-  leg_tit.push_back("Pos 5");
-  leg_tit.push_back("Pos 6");
-
-  cv_tib->cd(9);
-  AddLegend(mgr, leg_tit);
-  cv_tob->cd(9);
-  AddLegend(mgr, leg_tit);
-  }
-
-
+  
+  
   if(group == LAS::ALL || group == LAS::AT || group == LAS::TEC_PLUS_AT || group == LAS::TEC_MINUS_AT){
   TCanvas* cv_tecp_at = new TCanvas("TECplus_AT", "TEC+ AT");
   cv_tecp_at->Divide(3,3);
@@ -1399,12 +1467,11 @@ void draw_global_data(const LASGlobalData<Avec>& theData, const LASGlobalData<Av
     std::ostringstream title;
     title << "Beam " << beam;
 
-    //std::cout << "Title: " << title.str() << std::endl;
-
     TMultiGraph* mgr;
     cv_tecp_at->cd(beam + 1);
     mgr = avec_draw(xval_tecp_at, data_tecp_at, title.str(),axis,"",options);
     if(axis == "time"){
+      std::cout << "Time axis" << std::endl;
       mgr->GetXaxis()->SetNdivisions(505, kTRUE);
       mgr->GetXaxis()->SetTimeDisplay(1);
       //mgr->GetXaxis()->SetTimeFormat("%d\/%m\/%y %H:%M");
@@ -1891,6 +1958,22 @@ const LASGlobalData<double>& zpos()
     for(LASGlobalDataLoop loop(LASGlobalDataLoop::TEC)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = tecz[loop.get_zpos()] * (1 - 2 * loop.get_det());
     for(LASGlobalDataLoop loop(LASGlobalDataLoop::TIB)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = LAS::zdat_tib[loop.get_zpos()];
     for(LASGlobalDataLoop loop(LASGlobalDataLoop::TOB)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = LAS::zdat_tob[loop.get_zpos()];
+    for(LASGlobalDataLoop loop(LASGlobalDataLoop::TEC_AT); !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = tecz[loop.get_zpos()] * (1 - 2 * loop.get_det());
+    not_initialized = false;
+  }
+  return zpos;
+}
+
+const LASGlobalData<double>& zpos_eff()
+{
+  static LASGlobalData<double> zpos;
+  static bool not_initialized = true;
+
+  if(not_initialized){
+    Avec tecz = LAS::zdat_tec + LAS::z_disc0;
+    for(LASGlobalDataLoop loop(LASGlobalDataLoop::TEC)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = tecz[loop.get_zpos()] * (1 - 2 * loop.get_det());
+    for(LASGlobalDataLoop loop(LASGlobalDataLoop::TIB)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = LAS::zdat_tib_eff[loop.get_zpos()];
+    for(LASGlobalDataLoop loop(LASGlobalDataLoop::TOB)   ; !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = LAS::zdat_tob_eff[loop.get_zpos()];
     for(LASGlobalDataLoop loop(LASGlobalDataLoop::TEC_AT); !loop.finished(); loop.next() ) loop.GetEntry<double>(zpos) = tecz[loop.get_zpos()] * (1 - 2 * loop.get_det());
     not_initialized = false;
   }

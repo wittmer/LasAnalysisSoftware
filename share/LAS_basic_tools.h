@@ -13,7 +13,6 @@
 
 #include <stdexcept>
 
-
 namespace LAS{
   class Exception : public std::runtime_error
   {
@@ -23,6 +22,9 @@ namespace LAS{
   };
 
   enum beam_group{ALL, TEC_PLUS, TEC_MINUS, TEC, AT, TIB, TOB, TEC_PLUS_AT, TEC_MINUS_AT, TEC_AT, TEC_PLUS_R4, TEC_PLUS_R6, TEC_MINUS_R4, TEC_MINUS_R6};
+  namespace FIT_TYPE{
+    enum fit_type{ALL, TEC_PLUS, TEC_MINUS, TEC, AT, TIB, TIB_OLD, TOB, TEC_PLUS_AT, TEC_MINUS_AT, TEC_AT, TEC_PLUS_R4, TEC_PLUS_R6, TEC_MINUS_R4, TEC_MINUS_R6};
+  };
 
   const double r_tec_r4 = 564.0;
   const double r_tec_r6 = 840.0;
@@ -55,8 +57,8 @@ namespace LAS{
   const Avec theta_at(8, at_theta_values);
 
   const double cos9deg = 0.987688341;
-  const double pitch_tec_r4=0.126029;  // Pitch Ring 4
-  const double pitch_tec_r6=0.189;     // Pitch Ring 6
+  const double pitch_tec_r4 = 0.126029;  // Pitch Ring 4
+  const double pitch_tec_r6 = 0.189;     // Pitch Ring 6
   const double pitch_at_tec = 0.126029;
   const double pitch_at_tib = 0.120 * cos9deg;
   const double pitch_at_tob = 0.183;
@@ -68,8 +70,11 @@ namespace LAS{
 class TLegend;
 class TTree;
 
+void mask_known_bad_modules(LASGlobalData<int>& mask);
+
 std::string get_next_line(std::istream& input);
 
+time_t make_root_time(double year, double month, double day, double hour, double min, double sec);
 time_t make_root_time_offset();
 
 void TreeMerge(const std::vector<std::string>& file_list, const std::string& tree_name, const std::string& outfile);
@@ -88,6 +93,16 @@ std::string  GetTEC2TECName( int subdetector, int beam, int disc, int underscore
 int invalid_indices(int subdet, int beam, int zpos, int ring=-1, int type=0, int verbose=0);
 
 #ifdef __CINT__
+
+#pragma link off all globals;
+#pragma link off all classes;
+#pragma link off all functions;
+#pragma link C++ nestedclasses;
+
+#pragma link C++ namespace LAS;
+#pragma link C++ namespace LAS::FIT_TYPE;
+
+#pragma link C++ function make_root_time(double, double, double, double, double, double);
 #pragma link C++ function sort_tree(const std::string&, const std::string&, const std::string&);
 #pragma link C++ function sort_tree(TTree*, const std::string&);
 #endif

@@ -1,4 +1,5 @@
-Unix.*.Root.DynamicPath:     .:$HOME/Avec:./share
+
+Unix.*.Root.DynamicPath:     .:$AVEC_DIR:$HOME/Avec:./share
 Unix.*.Root.MacroPath:   .:./share
 Unix.*.Root.UseTTFonts:     true
 
@@ -8,5 +9,5 @@ Rint.Logon:              rootlogon.C
 
 Rint.History:            ./.root_hist
 
-ACLiC.IncludePaths:     -I/$HOME/Avec -I./ -I./share
+ACLiC.IncludePaths:     -I$AVEC_DIR -I/$HOME/Avec -I./ -I./share
 

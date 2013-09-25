@@ -1,21 +1,22 @@
-//#ifdef __CINT__
+#ifdef __CINT__
 
 #pragma link off all globals;
 #pragma link off all classes;
 #pragma link off all functions;
 
-#define __AVECROOT__
-#include "Avec.h"
-#include "Avec2D.h"
 
 #include "LASGlobalData.h"
 #include "LASGlobalDataLoop.h"
 #include "LAS_basic_tools.h"
-#include "LAS_alpar.h"
 #include "LAS_globaldata_tools.h"
+
+#define __AVECROOT__
+#include "Avec.h"
+#include "Avec2D.h"
+
+#include "LAS_alpar.h"
 #include "LAS_RDC_tools.h"
 #include "LAS_control_plots.h"
-
 #include "LAS_At_rec.h"
 
 #pragma link C++ class LASGlobalDataLoop+;
@@ -23,7 +24,6 @@
 #pragma link C++ function LASGlobalDataLoop::GetEntry<double>(LASGlobalData<double>&)+;
 #pragma link C++ function LASGlobalDataLoop::GetEntry<int>(LASGlobalData<int>&)+;
 #pragma link C++ function LASGlobalDataLoop::GetEntry<Avec>(LASGlobalData<Avec>&)+;
-//#pragma link C++ function LASGlobalDataLoop::GetEntry< std::vector<float> >(LASGlobalData< std::vector<float> >&)+;
 #pragma link C++ function LASGlobalDataLoop::GetEntry< vector<float> >(LASGlobalData< vector<float> >&)+;
 #pragma link C++ function LASGlobalDataLoop::GetEntry< vector<int> >(LASGlobalData< vector<int> >&)+;
 
@@ -56,9 +56,16 @@
 #pragma link C++ class TecPar+;
 #pragma link C++ class TecRingPar+;
 #pragma link C++ class LasAlPar+;
+#pragma link C++ class LAS::AnalysisParameters+;
 
+#pragma link C++ namespace LAS;
 
-//#pragma link C++ function rec_LAS_AT_TIB_data(const std::string&)+;
-//#pragma link C++ function rec_AT_TIB(const std::string&, unsigned int, const std::string&)+;
+#pragma link C++ defined_in "LAS_globaldata_tools.h";
+#pragma link C++ defined_in "LAS_basic_tools.h";
+#pragma link C++ defined_in "LAS_alpar.h";
+#pragma link C++ defined_in "LAS_At_rec.h";
+#pragma link C++ defined_in "LAS_control_plots.h";
+#pragma link C++ defined_in "LAS_calibration.h";
+#pragma link C++ defined_in "LAS_data_processing.h";
 
-//#endif
+#endif

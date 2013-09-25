@@ -58,6 +58,10 @@ class LASGlobalData : public TNamed
   template <class T2> LASGlobalData(const LASGlobalData<T2>&);
 #endif
   
+  // Overloaded Methods of TObject
+  virtual void	Draw(Option_t* option = "");
+  virtual void Browse(TBrowser* b);
+
  private:
   //void Init( void );
   void Init( const T& in=T());
@@ -69,7 +73,7 @@ class LASGlobalData : public TNamed
   std::vector<std::vector<T> > tobData; // beam<pos<T>>
   
   bool ValidIndices( int det, int ring, int beam, int zpos ) const; // Check if indices identify a valid LAS module
-  
+
   ClassDef( LASGlobalData, 2 );
 };
 
@@ -474,6 +478,28 @@ LASGlobalData<T>::LASGlobalData(const LASGlobalData<T2>& ori)
   }
 }
 #endif
+
+template <class T>
+void global_data_draw(const LASGlobalData<T>&)
+{
+  std::cout << "global_data_draw<T> not implemented for this type" << std::endl;
+}
+
+#include "TBrowser.h"
+
+// Overloaded TObject methods
+template <class T>
+void LASGlobalData<T>::Draw(Option_t* option)
+{
+  if(option || 1)
+    global_data_draw(*this);
+}
+
+template <class T>
+void LASGlobalData<T>::Browse(TBrowser* b)
+{
+  Draw(b ? b->GetDrawOption() : "");
+}
 
 
 

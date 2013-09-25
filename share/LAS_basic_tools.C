@@ -32,6 +32,62 @@ std::string get_next_line(std::istream& input)
   return "";
 }
 
+void mask_known_bad_modules(LASGlobalData<int>& mask)
+{
+  // TOB
+  mask.GetEntry(3, -1, 6, 0) = 0;
+  mask.GetEntry(3, -1, 7, 5) = 0;
+  mask.GetEntry(3, -1, 2, 2) = 0;
+  mask.GetEntry(3, -1, 5, 3) = 0;
+  // mask.GetEntry(3, -1, 7, 4) = 0;
+
+  // TIB
+  mask.GetEntry(2, -1, 2, 0) = 0;
+
+  // TEC- AT
+  mask.GetEntry(1, -1, 6, 2) = 0;
+  //mask.GetEntry(1, -1, 2, 0) = 0;
+  //mask.GetEntry(1, -1, 2, 1) = 0;
+  mask.GetEntry(1, -1, 3, 0) = 0;
+  mask.GetEntry(1, -1, 3, 1) = 0;
+  mask.GetEntry(1, -1, 3, 2) = 0;
+  mask.GetEntry(1, -1, 3, 3) = 0;
+  mask.GetEntry(1, -1, 3, 4) = 0;
+
+  // TEC+ AT
+  mask.GetEntry(0, -1, 3, 0) = 0;
+  mask.GetEntry(0, -1, 2, 0) = 0;
+  mask.GetEntry(0, -1, 2, 1) = 0;
+  mask.GetEntry(0, -1, 2, 2) = 0;
+
+  // TEC+ R4
+  mask.GetEntry(0, 0, 7, 0) = 0;
+
+
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//! Function to create a time structure for rROOT format
+time_t make_root_time(double year, double month, double day, double hour, double min, double sec)
+{
+  // Needed to make mktime behave properly. Best would be to use <chrono> or some boost library for time manipulations
+  setenv("TZ", "", 1);
+  tzset();
+
+
+  tm date;
+  date.tm_sec  = (int)sec;
+  date.tm_min  = (int)min;
+  date.tm_hour = (int)hour;
+  date.tm_mday = (int)day;
+  date.tm_mon = (int)month - 1;
+  date.tm_year = (int)year;
+  return mktime(&date);
+}
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //! Function to compute the difference between root time and unix time
 time_t make_root_time_offset()
@@ -41,6 +97,10 @@ time_t make_root_time_offset()
   // I am not sure if I am doing things right, so there may be 1 hour shift w.r.t. the real time...
   // Note that the valid month range is 0-11, while the valid days run from 1-31 ...
 
+  // Needed to make mktime behave properly. Best would be to use <chrono> or some boost library for time manipulations
+  setenv("TZ", "", 1);
+  tzset();
+
   tm mydate;
   mydate.tm_sec  = 0;
   mydate.tm_min  = 0;
@@ -49,7 +109,7 @@ time_t make_root_time_offset()
   mydate.tm_mon = 0;
   mydate.tm_year = 95;
   time_t root_offset = mktime(&mydate);
-  std::cout << "root_offset: " << root_offset << "  =  " << ctime(&root_offset) << std::endl;
+  //std::cout << "root_offset: " << root_offset << "  =  " << ctime(&root_offset) << std::endl;
   return root_offset;
 }
 

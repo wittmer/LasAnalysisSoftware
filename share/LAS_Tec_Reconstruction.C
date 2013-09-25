@@ -307,6 +307,12 @@ void correct_signs(LASGlobalData<double>& data)
     loop.GetEntry<double>(data) *= -1.0;
   }while(loop.next());
 
+  //std::cout << "Not Inverting TEC- AT" << std::endl;
+  loop = LASGlobalDataLoop(LASGlobalDataLoop::TEC_MINUS_AT);
+  do{
+    loop.GetEntry<double>(data) *= -1.0;
+  }while(loop.next());
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

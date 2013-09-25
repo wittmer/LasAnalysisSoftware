@@ -5,9 +5,11 @@
 #define __AVECROOT__
 #include "Avec.h"
 
-class LasAlPar;
-class TecPar;
+#include "LAS_basic_tools.h"
 
+class TecPar;
+class AtPar;
+class LasAlPar;
 
 LasAlPar& alpar_get(const std::string& name, TFile& file);
 LasAlPar& alpar_get(const std::string& objname, const std::string& filename);
@@ -17,20 +19,32 @@ void separate_correlations_tec(TecPar& alpar, bool keep_flag = false);
 void alpar_rand_gauss(TecPar& alpar, double sigma_dphik, double sigma_dxk, double sigma_dyk);
 void alpar_rand_gauss(LasAlPar& alpar, double sigma_dphik, double sigma_dxk, double sigma_dyk);
 
+
+class AtChi : public TNamed
+{
+ public:
+  AtChi();
+ public:
+  double AT; //chi^{2}/ndf for AT
+  Avec beam; // chi2/ndf of beams
+  double tob; //chi^{2}/ndf for TOB
+  double tib; //chi^{2}/ndf for TIB
+  double tecp; //chi^{2}/ndf for TEC+ 
+  double tecm; //chi^{2}/ndf for TEC- to TOB
+
+  ClassDef( AtChi, 1 );
+};
+
 class AtPar : public TNamed
 {
 public:
   AtPar();
+  void print(LAS::beam_group beam_group = LAS::AT, int detail_flag = 0);
 public:
-  double AT_chi; //chi^{2}/ndf for AT
-  double AT_chi0; //chi^{2}/ndf for AT before fit
-
   Avec beam_a; //beam slopes
   Avec beam_b; //beam offsets
   Avec er_beam_a; //errors of beam slopes 
   Avec er_beam_b; //errors of beam offsets
-  Avec b_chi; // chi2/ndf of beams
-  Avec b_chi0; // chi2/ndf of beams before fit
 
   double tob_dx; //TOB x-displacement
   double tob_dy; //TOB y-displacement
@@ -59,8 +73,6 @@ public:
   double tob_ryrz; //correlation TOB ry&rz
   double tob_rytz; //correlation TOB ry&tz
   double tob_rztz; //correlation TOB rz&tz
-  double tob_chi; //chi^{2}/ndf for TOB
-  double tob_chi0; //chi^{2}/ndf for TOB before fit
 
   double tib_dx; //TIB x-displacement
   double tib_dy; //TIB y-displacement
@@ -89,8 +101,6 @@ public:
   double tib_ryrz; //correlation TIB ry&rz
   double tib_rytz; //correlation TIB ry&tz
   double tib_rztz; //correlation TIB rz&tz
-  double tib_chi; //chi^{2}/ndf for TIB
-  double tib_chi0; //chi^{2}/ndf for TIB before fit
 
   double tecp_dx; //TEC+ x-displacement
   double tecp_dy; //TEC+ y-displacement
@@ -119,8 +129,6 @@ public:
   double tecp_ryrz; //correlation TEC+ ry&rz
   double tecp_rytz; //correlation TEC+ ry&tz
   double tecp_rztz; //correlation TEC+ rz&tz
-  double tecp_chi; //chi^{2}/ndf for TEC+ 
-  double tecp_chi0; //chi^{2}/ndf for TEC+ before fit
 
   double tecm_dx; //TEC- x-displacement
   double tecm_dy; //TEC- y-displacement
@@ -149,10 +157,11 @@ public:
   double tecm_ryrz; //correlation TEC- ry&rz
   double tecm_rytz; //correlation TEC- ry&tz
   double tecm_rztz; //correlation TEC- rz&tz
-  double tecm_chi; //chi^{2}/ndf for TEC- to TOB
-  double tecm_chi0; //chi^{2}/ndf for TEC- before fit
 
-  ClassDef( AtPar, 1 );
+  AtChi chi0;
+  AtChi chi;
+
+  ClassDef( AtPar, 2 );
 };
 
 std::ostream& operator<<(std::ostream& out, const AtPar& ap);
@@ -221,7 +230,12 @@ public:
   Avec DthetaA_r4, DthetaB_r4;
   Avec DthetaA_r6, DthetaB_r6;
 
-  ClassDef( TecPar, 1 );
+  double Dphi0_er, Dx0_er, Dy0_er, Dphit_er, Dxt_er, Dyt_er;
+  Avec Dphik_er, Dxk_er, Dyk_er;
+  Avec DthetaA_r4_er, DthetaB_r4_er;
+  Avec DthetaA_r6_er, DthetaB_r6_er;
+
+  ClassDef( TecPar, 2 );
 };
 
 

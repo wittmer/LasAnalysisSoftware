@@ -11,6 +11,8 @@
 
 #include "LAS_basic_tools.h"
 #include "LAS_globaldata_tools.h"
+#include "LAS_RDC_tools.h"
+#include "LAS_Tec_Reconstruction.h"
 
 #include "TGraph.h"
 #include "TCanvas.h"
@@ -21,6 +23,204 @@
 #include "TH1.h"
 #include "THStack.h"
 
+// Determine the maximum signal of a laser profil
+// algo_type determines how the signal is calculated
+// 0 : maximum strip signal
+// 1 : average of maximum strip and the two neighbors to the left and right
+double profile_signal(const Avec& profile, int algo_type = 0)
+{
+  switch(algo_type){
+  case 0:
+    return vmax(profile);
+    break;
+  case 1:{
+    double signal = 0;
+    unsigned int max_idx = lvmax(profile);
+    if(max_idx > 2 && max_idx < 500) signal = (profile[max_idx] + profile[max_idx+1] + profile[max_idx-1]) / 3;
+    return signal;
+    break;}
+  default:
+    throw LAS::Exception("Error in profile_signal: Unknown algo_type");
+  }
+  return 0;
+}
+
+// Plot the history of the profile maxima, to check the stability of the signal, special for long run lists
+// Right now you have to pick only one specific module
+void control_profile_maxima_long(const std::string& run_list_name, const std::string& path_prefix, int subdet, int beam, int ring, int zpos, int algo_type)
+{
+  // Read in the run list (first entry is reference file) 
+  std::string ref_filename;
+  std::vector<std::string> file_list;
+  get_file_list(run_list_name, ref_filename, file_list, path_prefix);
+
+  Avec time_axis;
+  Avec signal;
+
+  // Loop over all runs  
+  for(unsigned int i = 0; i < file_list.size(); i++){
+    std::cout << "\nProcessing file " << file_list[i] << std::endl;
+    TFile file((file_list[i]).c_str(), "READ");
+
+    // Check if the run is labled as good
+    Avec good_run = avec_get("good_run", file);
+    if(good_run.empty()){
+      std::cerr << "Warning: No good_run quality flag in this file, will skip it." << std::endl;
+      continue;
+    }
+    if( good_run[0] == 0){
+      std::cerr << "Run is flagged as bad, but I will not skip it!" << std::endl;
+    }
+    
+    // Get blocks flag and timestamp
+    Avec good_block = avec_get("good_block",file);
+    Avec block_timestamp = avec_get("block_timestamp", file);
+    //std::cout << "Nr. of good blocks: " << vsum(good_block) << " out of " << good_block.size() << ", ratio is " << double(vsum(good_block))/double(good_block.size()) << std::endl;
+    if(vsum(good_block) < 1)continue;
+
+    // Loop over all blocks in one run
+    for(unsigned int blnr = 0; blnr < good_block.size(); blnr++){
+      if(good_block[blnr] == 0){
+	//std::cout << "Bad block Nr." << blnr << std::endl;
+	continue;
+      }
+      std::ostringstream block_nr;
+      block_nr << blnr;
+	
+      LASGlobalData<Avec>& profiles = global_data_get<Avec>("profiles_" + block_nr.str(), file);
+      time_axis.push_back(block_timestamp[blnr]);
+      signal.push_back(profile_signal(profiles.GetEntry(subdet, ring, beam, zpos)));
+      delete &profiles;
+    }
+    file.Close();
+  } 
+
+  avec_draw(time_axis, signal, "Module Signal", "time", "ADC counts", "AP");
+  //avec_compress(time_axis, maximum, max_length, true);
+
+}
+
+// Plot the correlation of intensity and position for every module
+void control_pos_int_correlation(const std::string& run_list_name, const std::string& path_prefix, LAS::beam_group group, int algo_type)
+{
+
+  // Read in the run list (first entry is reference file) 
+  std::string ref_filename;
+  std::vector<std::string> file_list;
+  get_file_list(run_list_name, ref_filename, file_list, path_prefix);
+
+  // Global data object for results
+  LASGlobalData<Avec> profile_maxima;
+  LASGlobalData<Avec> position;
+
+  // Loop over all runs  
+  for(unsigned int i = 0; i < file_list.size(); i++){
+    std::cout << "\nProcessing file " << file_list[i] << std::endl;
+    TFile file((file_list[i]).c_str(), "READ");
+
+    // Check if the run is labled as good
+    Avec good_run = avec_get("good_run", file);
+    if(good_run.empty()){
+      std::cerr << "Warning: No good_run quality flag in this file, will skip it." << std::endl;
+      continue;
+    }
+    if( good_run[0] == 0){
+      std::cerr << "Run is flagged as bad, but I will not skip it!" << std::endl;
+    }
+    
+    // Get blocks flag and timestamp
+    Avec good_block = avec_get("good_block",file);
+    Avec block_timestamp = avec_get("block_timestamp", file);
+    std::cout << "Nr. of good blocks: " << vsum(good_block) << " out of " << good_block.size() << ", ratio is " << double(vsum(good_block))/double(good_block.size()) << std::endl;
+    if(vsum(good_block) < 1)continue;
+
+    // Loop over all blocks in one run
+    for(unsigned int blnr = 0; blnr < good_block.size(); blnr++){
+      if(good_block[blnr] == 0){
+	std::cout << "Bad block Nr." << blnr << std::endl;
+	continue;
+      }
+      std::ostringstream block_nr;
+      block_nr << blnr;
+
+      LASGlobalData<Avec>& profiles = global_data_get<Avec>("profiles_" + block_nr.str(), file);
+      LASGlobalData<double>& pos = global_data_get<double>("positions_" + block_nr.str(), file);
+
+      LASGlobalDataLoop loop(convert_to_loop_type(group));
+      do{
+	const Avec& prof = loop.GetEntry(profiles);
+	loop.GetEntry(profile_maxima).push_back( profile_signal(prof) );
+	loop.GetEntry(position).push_back( loop.GetEntry(pos) );
+      }while(loop.next());
+      delete &profiles;
+      delete &pos;
+    }
+    file.Close();
+  } 
+
+  //draw_global_data(profile_maxima, "AP", group);
+  draw_global_data(profile_maxima, position, "AP", "pos", group);
+}
+
+// Plot the history of the profile maxima, to check the stability of the signal
+void control_profile_maxima(const std::string& run_list_name, const std::string& path_prefix, LAS::beam_group group, int algo_type)
+{
+
+  // Read in the run list (first entry is reference file) 
+  std::string ref_filename;
+  std::vector<std::string> file_list;
+  get_file_list(run_list_name, ref_filename, file_list, path_prefix);
+
+  // Global data object for results
+  LASGlobalData<Avec> profile_maxima;
+  Avec time_axis;
+
+  // Loop over all runs  
+  for(unsigned int i = 0; i < file_list.size(); i++){
+    std::cout << "\nProcessing file " << file_list[i] << std::endl;
+    TFile file((file_list[i]).c_str(), "READ");
+
+    // Check if the run is labled as good
+    Avec good_run = avec_get("good_run", file);
+    if(good_run.empty()){
+      std::cerr << "Warning: No good_run quality flag in this file, will skip it." << std::endl;
+      continue;
+    }
+    if( good_run[0] == 0){
+      std::cerr << "Run is flagged as bad, but I will not skip it!" << std::endl;
+    }
+    
+    // Get blocks flag and timestamp
+    Avec good_block = avec_get("good_block",file);
+    Avec block_timestamp = avec_get("block_timestamp", file);
+    std::cout << "Nr. of good blocks: " << vsum(good_block) << " out of " << good_block.size() << ", ratio is " << double(vsum(good_block))/double(good_block.size()) << std::endl;
+    if(vsum(good_block) < 1)continue;
+
+    // Loop over all blocks in one run
+    for(unsigned int blnr = 0; blnr < good_block.size(); blnr++){
+      if(good_block[blnr] == 0){
+	std::cout << "Bad block Nr." << blnr << std::endl;
+	continue;
+      }
+      std::ostringstream block_nr;
+      block_nr << blnr;
+
+      LASGlobalData<Avec>& profiles = global_data_get<Avec>("profiles_" + block_nr.str(), file);
+      time_axis.push_back(block_timestamp[blnr]);
+
+      LASGlobalDataLoop loop(convert_to_loop_type(group));
+      do{
+	const Avec& prof = loop.GetEntry(profiles);
+	loop.GetEntry(profile_maxima).push_back( profile_signal(prof));
+      }while(loop.next());
+      delete &profiles;
+    }
+    file.Close();
+  } 
+
+  //draw_global_data(profile_maxima, "AP", group);
+  draw_global_data(profile_maxima, time_axis, "AP", "time", group);
+}
 
 bool run_selector(const std::string& result_file, double& bad_ratio, Avec::size_type& nr_blocks, double& block_ratio, bool print)
 {
@@ -219,7 +419,6 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
 
     alpar.RescaleRot(1e6);
     alpar.RescaleTrans(1e3);
-
 
     // Disc Parameters
     tecp_r4_dphik.push_back(alpar.tecp_r4.Dphik);
@@ -497,7 +696,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
   legend.push_back("Disc 9");
 
   if(process_rings){
-    TCanvas* cv_tecp_r4 = new TCanvas("cv_tecp_r4","Disc Parameters TEC+ Ring 4", 1500, 1000);
+    TCanvas* cv_tecp_r4 = new TCanvas("cv_tecp_r4","TEC+ Disc Parameters Ring 4", 1500, 1000);
     cv_tecp_r4->Divide(2,2);
     
     cv_tecp_r4->cd(1);
@@ -516,7 +715,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
     AddLegend(mgr, legend, 2, 0.3, 0.2, 0.8, 0.8);
     cv_tecp_r4->Print("discpar_tecp_r4.png");
     
-    TCanvas* cv_tecp_r6 = new TCanvas("cv_tecp_r6","Disc Parameters TEC+ Ring 6", 1500, 1000);
+    TCanvas* cv_tecp_r6 = new TCanvas("cv_tecp_r6","TEC+ Disc Parameters Ring 6", 1500, 1000);
     cv_tecp_r6->Divide(2,2);
     
     cv_tecp_r6->cd(1);
@@ -536,7 +735,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
     cv_tecp_r6->Print("discpar_tecp_r6.png");
     
     
-    TCanvas* cv_tecm_r4 = new TCanvas("cv_tecm_r4","Disc Parameters TEC- Ring 4", 1500, 1000);
+    TCanvas* cv_tecm_r4 = new TCanvas("cv_tecm_r4","TEC- Disc Parameters Ring 4", 1500, 1000);
     cv_tecm_r4->Divide(2,2);
     
     cv_tecm_r4->cd(1);
@@ -560,7 +759,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
     std::cout << "Average RMS   Dxk: " << calc_rms(tecm_r6_dxk) << std::endl;
     std::cout << "Average RMS   Dyk: " << calc_rms(tecm_r6_dyk) << std::endl;
     
-    TCanvas* cv_tecm_r6 = new TCanvas("cv_tecm_r6","Disc Parameters TEC- Ring 6", 1500, 1000);
+    TCanvas* cv_tecm_r6 = new TCanvas("cv_tecm_r6","TEC- Disc Parameters Ring 6", 1500, 1000);
     cv_tecm_r6->Divide(2,2);
     
     cv_tecm_r6->cd(1);
@@ -583,7 +782,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
     cv_tecm_r6->Print("discpar_tecm_r6.png");
   }
 
-  TCanvas* cv_tecp = new TCanvas("cv_tecp","Disc Parameters TEC+", 1500, 1000);
+  TCanvas* cv_tecp = new TCanvas("cv_tecp","TEC+ Disc Parameters", 1500, 1000);
   cv_tecp->Divide(2,2);
 
   cv_tecp->cd(1);
@@ -605,7 +804,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
   AddLegend(mgr, legend, 2, 0.3, 0.2, 0.8, 0.8);
   cv_tecp->Print("discpar_tecp.png");
 
-  TCanvas* cv_tecm = new TCanvas("cv_tecm","Disc Parameters TEC-", 1500, 1000);
+  TCanvas* cv_tecm = new TCanvas("cv_tecm","TEC- Disc Parameters", 1500, 1000);
   cv_tecm->Divide(2,2);
 
   cv_tecm->cd(1);
@@ -628,7 +827,7 @@ void alpar_history_draw(const std::vector<LasAlPar>& par_list, const Avec& xvals
   cv_tecm->Print("discpar_tecm.png");
 
 
-  TCanvas* cv_globpar_full = new TCanvas("cv_globpar_full","Global TEC Parameters (full reconstruction)", 700, 1000);
+  TCanvas* cv_globpar_full = new TCanvas("cv_globpar_full","TEC Global Parameters (full reconstruction)", 700, 1000);
   cv_globpar_full->Divide(1,2);
   cv_globpar_full->cd(1);
   //mgr = avec_draw(xvals, globpar_tecp, "TEC+ (full)","","#Delta#phi/#Deltaxy [#murad/#mum]",options);
@@ -703,6 +902,154 @@ void alpar_history_fine(const std::vector<std::string>& file_list)
 
 }
 
+void control_pos_err(const std::string& results_file, const std::string& ref_filename)
+{
+  // Get the reference positions
+  std::cout << "Reference file is: " << ref_filename << std::endl;
+  LASGlobalData<double> ref_pos;
+  LASGlobalData<double> ref_err;
+  LASGlobalData<int> ref_mask;
+  get_ref_pos(ref_filename, ref_pos, ref_err, ref_mask);
+
+  mask_known_bad_modules(ref_mask);
+  
+  // Get blocks flag and timestamp
+  TFile f(results_file.c_str(), "READ");
+  //Avec block_nr = avec_get("block_nr", f);
+  Avec good_block = avec_get("good_block",f);
+  Avec block_timestamp = avec_get("block_timestamp", f);
+  if(good_block.empty() || block_timestamp.empty()){
+    std::cerr << "Error in control_rms: not all objects were found" << std::endl;
+    return;
+  }
+  std::cout << "Nr. of good blocks: " << vsum(good_block) << " out of " << good_block.size() << ", ratio is " << double(vsum(good_block))/double(good_block.size()) << std::endl;
+
+  LASGlobalData<Avec> xval;
+  LASGlobalData<Avec> err_history;
+
+  for(Avec::size_type blnr = 0; blnr < good_block.size(); blnr++){
+    if(good_block[blnr] == 0){
+      std::cout << "Bad block Nr." << blnr << std::endl;
+      continue;
+    }
+    std::ostringstream block_nr;
+    block_nr << blnr;
+
+    LASGlobalData<double> pos = global_data_get<double>("positions_" + block_nr.str(), f);
+    LASGlobalData<double> rms = global_data_get<double>("pos_error_" + block_nr.str(),f);
+    LASGlobalData<int> norm = global_data_get<int>("norm_" + block_nr.str(),f);
+    LASGlobalData<int> pos_mask = global_data_get<int>("positions_mask_" + block_nr.str(), f);
+    rms /= sqrt(norm);
+    remove_nan(rms);
+    
+    LASGlobalData<double> dif_mm = (pos - ref_pos)*pitch();
+    correct_signs(dif_mm);
+    LASGlobalData<double> error_mm = sqrt(rms*rms + ref_err*ref_err)*pitch();
+    LASGlobalData<int> mask = ref_mask && pos_mask && fabs(dif_mm) < 1.0;
+
+    LASGlobalDataLoop loop;
+    do{
+      if(loop.GetEntry(mask)){
+	loop.GetEntry(xval).push_back(block_timestamp[blnr]);
+	loop.GetEntry(err_history).push_back(loop.GetEntry<double>(error_mm * 1000));
+      }
+    }while(loop.next());
+    if(blnr == good_block.size()-1) plot_global_data(error_mm * 1000, mask);
+  }
+  f.Close();
+
+  xval -= 7200;
+
+  Avec::VERBOSE_FLAG = 0;
+  draw_global_data(err_history, xval, "AP", "tome");
+  Avec::VERBOSE_FLAG = 1;
+}
+
+void control_positions(const std::string& results_file, const std::string& ref_filename)
+{
+  // Get the reference positions
+  std::cout << "Reference file is: " << ref_filename << std::endl;
+  LASGlobalData<double> ref_pos;
+  LASGlobalData<double> ref_err;
+  LASGlobalData<int> ref_mask;
+  get_ref_pos(ref_filename, ref_pos, ref_err, ref_mask);
+
+  TFile f(results_file.c_str(), "READ");
+  Avec block_nr = avec_get("block_nr", f);
+  Avec block_timestamp = avec_get("block_timestamp", f);
+  if(block_nr.empty() || block_timestamp.empty()){
+    std::cerr << "Error in control_positions: not all objects were found" << std::endl;
+    return;
+  }
+
+  LASGlobalData<Avec> xval;
+  LASGlobalData<Avec> pos_history;
+  LASGlobalData<Avec> err_history;
+  LASGlobalData<Avec> rms_history;
+  //LASGlobalData<Avec> mask_history;
+
+  for(Avec::size_type i = 0; i < block_nr.size(); i++){
+    std::cout << "Processing block " << i << std::endl;
+
+    std::ostringstream norm_name;
+    std::ostringstream pos_name;
+    std::ostringstream rms_av_name;
+    std::ostringstream mask_name;
+    norm_name << "norm_" << i;
+    pos_name << "positions_" << i;
+    //rms_av_name << "rms_av_" << i;
+    rms_av_name << "pos_error_" << i;
+    mask_name << "positions_mask_" << i;
+    LASGlobalData<int> norm = global_data_get<int>(norm_name.str(), f);
+    LASGlobalData<double> pos = global_data_get<double>(pos_name.str(), f) - ref_pos;
+    LASGlobalData<double> rms_av = global_data_get<double>(rms_av_name.str(), f);
+    LASGlobalData<int> mask = global_data_get<int>(mask_name.str(), f);
+    LASGlobalData<double> err = sqrt(rms_av*rms_av/norm);
+
+    correct_signs(pos);
+
+    LASGlobalDataLoop loop;
+    do{
+      if(loop.GetEntry(mask)){
+	loop.GetEntry(xval).push_back(block_timestamp[i]);
+	loop.GetEntry(pos_history).push_back(loop.GetEntry<double>(pos));
+	loop.GetEntry(rms_history).push_back(loop.GetEntry<double>(rms_av));
+	loop.GetEntry(err_history).push_back(loop.GetEntry<double>(err));
+	//loop.GetEntry(mask_history).push_back(loop.GetEntry(mask));
+      }
+    }while(loop.next());
+  }
+  f.Close();
+
+  Avec v_avg_err;
+  Avec v_run_rms;
+  LASGlobalDataLoop checkloop;
+  do{
+    std::cout << GetModuleName(checkloop);
+    Avec& err = checkloop.GetEntry(err_history);
+    Avec& pos = checkloop.GetEntry(pos_history);
+    if(! err.empty()){
+      //pos -= vsum(pos)/pos.size();
+      double average_err = (vsum(err)/err.size());
+      double run_rms = (sqrt((vsum(pos*pos) - vsum(pos) * vsum(pos)/pos.size())/(pos.size()-1)));
+      std::cout << ": has average err of " << average_err;
+      std::cout << "  and run rms of " << run_rms;
+      v_avg_err.push_back(average_err);
+      v_run_rms.push_back(run_rms);
+    }
+    std::cout << std::endl;
+  }while (checkloop.next());
+
+  xval -= 7200;
+
+  Avec::VERBOSE_FLAG = 0;
+  draw_global_data(pos_history, err_history, xval, "AP", "time");
+  Avec::VERBOSE_FLAG = 1;
+  new TCanvas("err_corr", "Correlations of Fluctuations");
+  //avec_draw(v_avg_err, v_run_rms, "", "Average block error", "Run rms");
+  avec_plot(v_avg_err, v_run_rms);
+}
+
 void control_positions(const std::string& filename)
 {
   TFile f(filename.c_str(), "READ");
@@ -768,6 +1115,8 @@ void control_positions(const std::string& filename)
     }
     std::cout << std::endl;
   }while (checkloop.next());
+
+  xval -= 7200;
 
   Avec::VERBOSE_FLAG = 0;
   draw_global_data(pos_history, err_history, xval, "AP", "time");
