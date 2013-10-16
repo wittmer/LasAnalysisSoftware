@@ -16,6 +16,7 @@ enum fibre_swap{ NONE, TECP_R6, TECP_R4, AT, ALL};
 
 void lsboard_scan_analysis(const std::string& data_filename, const std::string& xdaq_log_filename, const std::string& results_filename, const std::string& xml_template_file, const std::string& xml_output_file);
 
+void generate_xml_config(const std::string& results_filename, const std::string& xml_template_file, const std::string& xml_output_file);
 void find_intensity_settings(const std::string& output_filename);
 void fit_intensity_ramps(const std::string& results_filename);
 void lsboard_intensity_ramp(const std::string& results_file);
@@ -36,5 +37,7 @@ void avec_linreg(const Avec& x, const Avec& y, double& a, double& b);
 TGraphErrors* pulseshape_fit(const Avec& xval, const Avec& data, double& xmax, double& ymax, int fit_type = 1, bool output = true);
 
 void cali_pos_control(const std::string& raw_data_filename, const std::string& results_filename, unsigned int board = 2, int det = 3, int ring = -1, int beam = 0, int zpos = 0);
+
+void create_directory_list(const Avec& board_list, std::vector<std::string>& directory_list);
 
 #endif

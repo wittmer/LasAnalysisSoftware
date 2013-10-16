@@ -19,8 +19,6 @@
 
 #include "Avec2D.h"
 
-void create_directory_list(const Avec& board_list, std::vector<std::string>& directory_list);
-
 void lsboard_scan_analysis(const std::string& data_filename, const std::string& xdaq_log_filename, const std::string& results_filename, const std::string& xml_template_file, const std::string& xml_output_file)
 {
   gSystem->Exec( ("../scripts/extract_lsboard_scan.sh " + xdaq_log_filename + " " + "xdaq_log").c_str() );
@@ -52,6 +50,49 @@ void lsboard_scan_analysis(const std::string& data_filename, const std::string& 
 
   find_intensity_settings(results_filename);
 
+  generate_xml_config(results_filename, xml_template_file, xml_output_file);
+
+}
+
+void generate_xml_config(const std::string& results_filename, const std::string& xml_template_file, const std::string& xml_output_file)
+{
+  TFile f(results_filename.c_str(), "READ");
+
+  Avec2D settings_board_1 = avec2d_get("intensity_setting_board_1", f);
+  Avec2D settings_board_2 = avec2d_get("intensity_setting_board_2", f);
+  Avec2D settings_board_3 = avec2d_get("intensity_setting_board_3", f);
+  Avec2D settings_board_4 = avec2d_get("intensity_setting_board_4", f);
+  Avec2D settings_board_5 = avec2d_get("intensity_setting_board_5", f);
+
+  Avec2D delay_board_1 = avec2d_get("delay_setting_board_1", f);
+  Avec2D delay_board_2 = avec2d_get("delay_setting_board_2", f);
+  Avec2D delay_board_3 = avec2d_get("delay_setting_board_3", f);
+  Avec2D delay_board_4 = avec2d_get("delay_setting_board_4", f);
+  Avec2D delay_board_5 = avec2d_get("delay_setting_board_5", f);
+
+  Avec2D norm_board_1 = avec2d_get("norm_board_1", f);
+  Avec2D norm_board_2 = avec2d_get("norm_board_2", f);
+  Avec2D norm_board_3 = avec2d_get("norm_board_3", f);
+  Avec2D norm_board_4 = avec2d_get("norm_board_4", f);
+  Avec2D norm_board_5 = avec2d_get("norm_board_5", f);
+
+  std::ofstream sf("sed_file.txt");
+  for(unsigned int diode = 0; diode < 8; diode++){
+    for(unsigned int level = 0; level < 5; level++){
+      sf << "s/__INT_1_" << diode+1 << "_" << level + 1 << "__/" << settings_board_1[level][diode] << "/\n";
+      sf << "s/__INT_2_" << diode+1 << "_" << level + 1 << "__/" << settings_board_2[level][diode] << "/\n";
+      sf << "s/__INT_3_" << diode+1 << "_" << level + 1 << "__/" << settings_board_3[level][diode] << "/\n";
+      sf << "s/__INT_4_" << diode+1 << "_" << level + 1 << "__/" << settings_board_4[level][diode] << "/\n";
+      sf << "s/__INT_5_" << diode+1 << "_" << level + 1 << "__/" << settings_board_5[level][diode] << "/\n";
+
+      sf << "s/__DEL_1_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_1[level][diode] ? (int)delay_board_1[level][diode] : 0) << "/\n"; 
+      sf << "s/__DEL_2_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_2[level][diode] ? (int)delay_board_2[level][diode] : 0) << "/\n"; 
+      sf << "s/__DEL_3_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_3[level][diode] ? (int)delay_board_3[level][diode] : 0) << "/\n"; 
+      sf << "s/__DEL_4_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_4[level][diode] ? (int)delay_board_4[level][diode] : 0) << "/\n"; 
+      sf << "s/__DEL_5_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_5[level][diode] ? (int)delay_board_5[level][diode] : 0) << "/\n"; 
+    }
+  }
+  sf.close();
 
   gSystem->Exec( ("sed -f sed_file.txt <" + xml_template_file + " >" + xml_output_file).c_str() );
 
@@ -279,12 +320,6 @@ void find_intensity_settings(const std::string& output_filename)
   delay_board_4 /= norm_board_4;
   delay_board_5 /= norm_board_5;
 
-  //avec_remove_nan( delay_board_1 );
-  //avec_remove_nan( delay_board_2 );
-  //avec_remove_nan( delay_board_3 );
-  //avec_remove_nan( delay_board_4 );
-  //avec_remove_nan( delay_board_5 );
-
   avec_remove_nan(delay_board_1);
   avec_remove_nan(delay_board_2);
   avec_remove_nan(delay_board_3);
@@ -303,6 +338,12 @@ void find_intensity_settings(const std::string& output_filename)
   delay_board_4.Write("delay_setting_board_4");
   delay_board_5.Write("delay_setting_board_5");
 
+  norm_board_1.Write("norm_board_1");
+  norm_board_2.Write("norm_board_2");
+  norm_board_3.Write("norm_board_3");
+  norm_board_4.Write("norm_board_4");
+  norm_board_5.Write("norm_board_5");
+
   step_mask.Write("step_mask");
 
   f.Close();
@@ -312,25 +353,6 @@ void find_intensity_settings(const std::string& output_filename)
 
   std::cout << "Step Mask:\n";
   print_global_data(step_mask);
-
-  std::ofstream sf("sed_file.txt");
-  for(unsigned int diode = 0; diode < 8; diode++){
-    for(unsigned int level = 0; level < 5; level++){
-      sf << "s/__INT_1_" << diode+1 << "_" << level + 1 << "__/" << settings_board_1[level][diode] << "/\n";
-      sf << "s/__INT_2_" << diode+1 << "_" << level + 1 << "__/" << settings_board_2[level][diode] << "/\n";
-      sf << "s/__INT_3_" << diode+1 << "_" << level + 1 << "__/" << settings_board_3[level][diode] << "/\n";
-      sf << "s/__INT_4_" << diode+1 << "_" << level + 1 << "__/" << settings_board_4[level][diode] << "/\n";
-      sf << "s/__INT_5_" << diode+1 << "_" << level + 1 << "__/" << settings_board_5[level][diode] << "/\n";
-
-      sf << "s/__DEL_1_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_1[level][diode] ? (int)delay_board_1[level][diode] : 0) << "/\n"; 
-      sf << "s/__DEL_2_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_2[level][diode] ? (int)delay_board_2[level][diode] : 0) << "/\n"; 
-      sf << "s/__DEL_3_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_3[level][diode] ? (int)delay_board_3[level][diode] : 0) << "/\n"; 
-      sf << "s/__DEL_4_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_4[level][diode] ? (int)delay_board_4[level][diode] : 0) << "/\n"; 
-      sf << "s/__DEL_5_" << diode+1 << "_" << level + 1 << "__/" <<  (norm_board_5[level][diode] ? (int)delay_board_5[level][diode] : 0) << "/\n"; 
-    }
-  }
-  sf.close();
-
 
   delete &bad_modules;
   delete &optimum_delay;
